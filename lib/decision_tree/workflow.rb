@@ -1,3 +1,6 @@
+require 'logger'
+require 'active_support/all'
+
 # Base class from which the actual workflows are derived. It's designed to
 # persist enough state in the change to allow the workflow to be repeatedly
 # and simultaneously instantiated, and transition into the current state
@@ -9,6 +12,7 @@ class DecisionTree::Workflow
   attr_reader :change
   attr_reader :redirect
   attr_reader :notifications
+  attr_accessor :logger
   attr_reader :steps # Temporary - should we persist this?
 
   def initialize(change)
@@ -16,7 +20,7 @@ class DecisionTree::Workflow
     @steps = []
     @notifications = []
     initialize_persistent_state(change.workflow_cache)
-    @proxy = WorkflowProxy.new(self)
+    @proxy = DecisionTree::Proxy.new(self)
 
     # We're using pessimistic locking here, so this will block until an
     # exclusive lock can be obtained on the change.
@@ -35,6 +39,10 @@ class DecisionTree::Workflow
     end
   end
 
+  def logger
+    @logger ||= Logger.new(STDOUT)
+  end
+
   private
 
   # We use a column on the change model to persist workflow across
@@ -47,13 +55,13 @@ class DecisionTree::Workflow
   # the method calls are records of non-idempotent method calls, which we
   # only want to call once in the lifecycle of the change.
   def initialize_persistent_state(workflow_state)
-    Rails.logger.info workflow_state
-    if workflow_state.blank?
-      @entry_points = OrderedSet.new
+    logger.info workflow_state
+    if workflow_state.empty?
+      @entry_points = DecisionTree::OrderedSet.new
       @nonidempotent_calls = Set.new
     else
       entries_slug, call_slug = workflow_state.split(':')
-      @entry_points = OrderedSet.new(entries_slug.try(:split, '/')) || OrderedSet.new
+      @entry_points = DecisionTree::OrderedSet.new(entries_slug.try(:split, '/')) || DecisionTree::OrderedSet.new
       @nonidempotent_calls = Set.new(call_slug.try(:split, '/')) || Set.new
     end
   end
@@ -101,7 +109,7 @@ class DecisionTree::Workflow
     assert_instance_method_exists!(method_name)
     aliased_method_name = alias_method_name(method_name)
 
-    yes_block, no_block = OptionsGrabber.new(&block).options
+    yes_block, no_block = DecisionTree::OptionsGrabber.new(&block).options
     fail YesAndNoRequiredError unless yes_block && no_block
 
     define_method(method_name) do

@@ -68,7 +68,7 @@ class DecisionTree::Workflow
 
   def persist_state!
     slug = @entry_points.to_a.join('/') + ':' + @nonidempotent_calls.to_a.join('/')
-    store.state(slug)
+    store.state = slug
   end
 
   # Instance methods

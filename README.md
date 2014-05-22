@@ -19,10 +19,20 @@ Or install it yourself as:
 ## Usage
 
 ```ruby
-
 class TestWorkflow < DecisionTree::Workflow
-end
+  def decision_method
+    true
+  end
 
+  decision :decision_method do
+    yes { it_returned_true }
+    no { it_returned_false }
+  end
+
+  start do
+    decision_method
+  end
+end
 ```
 
 ## Contributing

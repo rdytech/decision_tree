@@ -1,18 +1,11 @@
 require 'spec_helper'
 
 describe DecisionTree::Workflow do
-  class Change
-    attr_accessor :workflow_cache
-
-    def workflow_cache
-      @workflow_cache ||= ''
-    end
-  end
-  let(:_change) { Change.new }
+  let(:store) { DecisionTree::Store.new }
 
   describe '.decision' do
     context "when the decision method isn't defined" do
-      it 'raises a Workflow::MethodNotDefinedError' do
+      it 'raises a DecisionTree::Workflow::MethodNotDefinedError' do
         expect do
           class TestWorkflow < DecisionTree::Workflow
             decision :this_wont_work do
@@ -20,7 +13,7 @@ describe DecisionTree::Workflow do
               no { exit }
             end
           end
-        end.to raise_error(Workflow::MethodNotDefinedError)
+        end.to raise_error(DecisionTree::Workflow::MethodNotDefinedError)
       end
     end
 
@@ -36,7 +29,7 @@ describe DecisionTree::Workflow do
               yes { exit }
             end
           end
-        end.to raise_error(Workflow::YesAndNoRequiredError)
+        end.to raise_error(DecisionTree::Workflow::YesAndNoRequiredError)
       end
     end
 
@@ -62,7 +55,7 @@ describe DecisionTree::Workflow do
       it 'calls only the yes block' do
         expect_any_instance_of(TestWorkflow).to receive(:it_returned_true).once.and_return(nil)
         expect_any_instance_of(TestWorkflow).not_to receive(:it_returned_false)
-        TestWorkflow.new(_change)
+        TestWorkflow.new(store)
       end
     end
 
@@ -88,7 +81,7 @@ describe DecisionTree::Workflow do
       it 'calls only the no block' do
         expect_any_instance_of(TestWorkflow).not_to receive(:it_returned_true)
         expect_any_instance_of(TestWorkflow).to receive(:it_returned_false).once.and_return(nil)
-        TestWorkflow.new(_change)
+        TestWorkflow.new(store)
       end
     end
 
@@ -111,16 +104,16 @@ describe DecisionTree::Workflow do
       context 'when a workflow in instantiated once' do
         it 'calls the non-idempotent method once' do
           expect_any_instance_of(TestWorkflow).to receive(:non_idempotent_action!).once
-          TestWorkflow.new(_change)
+          TestWorkflow.new(store)
         end
       end
 
       context 'when a workflow is instantiated more than once' do
         it 'calls the non-idempotent method only once' do
           expect_any_instance_of(TestWorkflow).to receive(:non_idempotent_action!).once
-          TestWorkflow.new(_change)
-          TestWorkflow.new(_change)
-          TestWorkflow.new(_change)
+          TestWorkflow.new(store)
+          TestWorkflow.new(store)
+          TestWorkflow.new(store)
         end
       end
     end
@@ -138,11 +131,11 @@ describe DecisionTree::Workflow do
     end
 
     context "when that entry point hasn't been used before" do
-      subject { TestWorkflow.new(_change) }
+      subject { TestWorkflow.new(store) }
 
-      it 'records it in the workflow_cache' do
+      it 'records it in the state' do
         subject.test_entry
-        expect(_change.workflow_cache).to match(/test_entry/)
+        expect(store.state).to match(/test_entry/)
       end
 
       it 'calls the aliased method' do
@@ -153,14 +146,14 @@ describe DecisionTree::Workflow do
 
     context 'when the entry point has been used before' do
       before do
-        test = TestWorkflow.new(_change)
+        test = TestWorkflow.new(store)
         test.test_entry
       end
 
       it 'automatically calls previous entry points' do
         # We call the external method rather than the aliased one.
         expect_any_instance_of(TestWorkflow).to receive(:test_entry).once
-        TestWorkflow.new(_change)
+        TestWorkflow.new(store)
       end
     end
   end
@@ -185,12 +178,12 @@ describe DecisionTree::Workflow do
 
     it 'evaluates the block' do
       expect_any_instance_of(TestWorkflow).to receive(:decision_method).once
-      TestWorkflow.new(_change)
+      TestWorkflow.new(store)
     end
 
-    it 'records the start method in the workflow_cache' do
-      TestWorkflow.new(_change)
-      expect(_change.workflow_cache).to match(/__start_workflow/)
+    it 'records the start method in the state' do
+      TestWorkflow.new(store)
+      expect(store.state).to match(/__start_workflow/)
     end
   end
 end

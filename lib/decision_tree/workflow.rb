@@ -2,29 +2,29 @@ require 'logger'
 require 'active_support/all'
 
 # Base class from which the actual workflows are derived. It's designed to
-# persist enough state in the change to allow the workflow to be repeatedly
+# persist enough state in the store to allow the workflow to be repeatedly
 # and simultaneously instantiated, and transition into the current state
 # permitted by the workflow.
 class DecisionTree::Workflow
   class YesAndNoRequiredError < StandardError; end
   class MethodNotDefinedError < StandardError; end
 
-  attr_reader :change
+  attr_reader :store
   attr_reader :redirect
   attr_reader :notifications
   attr_accessor :logger
   attr_reader :steps # Temporary - should we persist this?
 
-  def initialize(change)
-    @change = change
+  def initialize(store=nil)
+    @store = store || DecisionTree::Store.new
     @steps = []
     @notifications = []
-    initialize_persistent_state(change.workflow_cache)
+    initialize_persistent_state(store.state)
     @proxy = DecisionTree::Proxy.new(self)
 
     # We're using pessimistic locking here, so this will block until an
     # exclusive lock can be obtained on the change.
-    @change.with_lock do
+    store.start do
       catch :exit do
         if @entry_points.empty?
           send(:__start_workflow)
@@ -45,7 +45,7 @@ class DecisionTree::Workflow
 
   private
 
-  # We use a column on the change model to persist workflow across
+  # We use a DecisionTree::Store to persist workflow across
   # instantiations of the workflow object, and guarantee idempotency. The
   # actual data is stored as a slug:
   #
@@ -53,7 +53,7 @@ class DecisionTree::Workflow
   #
   # where the entry_point is the last entry point into the workflow, and
   # the method calls are records of non-idempotent method calls, which we
-  # only want to call once in the lifecycle of the change.
+  # only want to call once in the lifecycle of the workflow.
   def initialize_persistent_state(workflow_state)
     logger.info workflow_state
     if workflow_state.empty?
@@ -68,14 +68,14 @@ class DecisionTree::Workflow
 
   def persist_state!
     slug = @entry_points.to_a.join('/') + ':' + @nonidempotent_calls.to_a.join('/')
-    @change.update_attribute(:workflow_cache, slug)
+    store.state(slug)
   end
 
   # Instance methods
   #-----------------------------------------------------------------------------
   def notify(*references)
     notifications = references.inject([]) do |notifications, reference|
-      notifications << IdempotentNotifier.new(@change, reference).deliver!
+      notifications << IdempotentNotifier.new(store, reference).deliver!
       @notifications << reference # TODO: This is only here for specs. Remove.
       notifications
     end
@@ -136,7 +136,7 @@ class DecisionTree::Workflow
       @entry_points << method_name.to_s
       @steps << ['Entry Point', method_name.to_s]
       send(aliased_method_name)
-      @change.with_lock do
+      store.start do
         catch :exit do
           @proxy.instance_eval(&block)
         end

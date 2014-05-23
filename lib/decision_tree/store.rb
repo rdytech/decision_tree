@@ -1,11 +1,8 @@
 
 class DecisionTree::Store
-    attr_accessor :state
+  attr_accessor :state
 
-    def start
-    end
-
-    def state
-      @state ||= ''
-    end
+  def start(&block)
+    yield
+  end
 end

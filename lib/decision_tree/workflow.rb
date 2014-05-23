@@ -19,7 +19,7 @@ class DecisionTree::Workflow
     @store = store || DecisionTree::Store.new
     @steps = []
     @notifications = []
-    initialize_persistent_state(store.state)
+    initialize_persistent_state
     @proxy = DecisionTree::Proxy.new(self)
 
     # We're using pessimistic locking here, so this will block until an
@@ -40,7 +40,7 @@ class DecisionTree::Workflow
   end
 
   def logger
-    @logger ||= Logger.new(STDOUT)
+    @logger ||= Logger.new(STDERR)
   end
 
   private
@@ -54,13 +54,12 @@ class DecisionTree::Workflow
   # where the entry_point is the last entry point into the workflow, and
   # the method calls are records of non-idempotent method calls, which we
   # only want to call once in the lifecycle of the workflow.
-  def initialize_persistent_state(workflow_state)
-    logger.info workflow_state
-    if workflow_state.empty?
+  def initialize_persistent_state
+    if !store.state
       @entry_points = DecisionTree::OrderedSet.new
       @nonidempotent_calls = Set.new
     else
-      entries_slug, call_slug = workflow_state.split(':')
+      entries_slug, call_slug = store.state.split(':')
       @entry_points = DecisionTree::OrderedSet.new(entries_slug.try(:split, '/')) || DecisionTree::OrderedSet.new
       @nonidempotent_calls = Set.new(call_slug.try(:split, '/')) || Set.new
     end

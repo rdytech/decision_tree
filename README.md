@@ -33,6 +33,22 @@ class TestWorkflow < DecisionTree::Workflow
     decision_method
   end
 end
+
+TestWorkflow.new
+```
+
+Implementing State
+
+```ruby
+class Change < ActiveRecord::Base
+  attr_accessible :state
+  
+  def start_workflow(&block)
+    with_lock do
+      yield 
+    end
+  end
+end
 ```
 
 ## Contributing

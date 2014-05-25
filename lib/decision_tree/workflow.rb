@@ -124,7 +124,7 @@ class DecisionTree::Workflow
       @entry_points << method_name.to_s
       @steps << ['Entry Point', method_name.to_s]
       send(aliased_method_name)
-      store.start do
+      store.start_workflow do
         catch :exit do
           @proxy.instance_eval(&block)
         end

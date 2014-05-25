@@ -4,11 +4,6 @@ class DecisionTree::Proxy < BasicObject
         @proxied_object = proxied_object
     end
     
-    def notify(*notifications)
-        @proxied_object.instance_eval { notify(*notifications) }
-        true
-    end
-    
     def exit(&block)
         @proxied_object.instance_eval(&block)
         throw :exit

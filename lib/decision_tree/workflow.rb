@@ -11,14 +11,12 @@ class DecisionTree::Workflow
 
   attr_reader :store
   attr_reader :redirect
-  attr_reader :notifications
   attr_accessor :logger
   attr_reader :steps # Temporary - should we persist this?
 
   def initialize(store=nil)
     @store = store || DecisionTree::Store.new
     @steps = []
-    @notifications = []
     initialize_persistent_state
     @proxy = DecisionTree::Proxy.new(self)
 

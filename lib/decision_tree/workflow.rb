@@ -24,7 +24,7 @@ class DecisionTree::Workflow
 
     # We're using pessimistic locking here, so this will block until an
     # exclusive lock can be obtained on the change.
-    store.start do
+    store.start_workflow do
       catch :exit do
         if @entry_points.empty?
           send(:__start_workflow)
@@ -68,17 +68,6 @@ class DecisionTree::Workflow
   def persist_state!
     slug = @entry_points.to_a.join('/') + ':' + @nonidempotent_calls.to_a.join('/')
     store.state = slug
-  end
-
-  # Instance methods
-  #-----------------------------------------------------------------------------
-  def notify(*references)
-    notifications = references.inject([]) do |notifications, reference|
-      notifications << IdempotentNotifier.new(store, reference).deliver!
-      @notifications << reference # TODO: This is only here for specs. Remove.
-      notifications
-    end
-    @steps << [:notification, notifications.compact]
   end
 
   public

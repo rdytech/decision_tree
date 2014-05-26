@@ -5,4 +5,8 @@ class DecisionTree::Store
   def start_workflow(&block)
     yield
   end
+
+  def state!(value)
+    @state = value
+  end
 end

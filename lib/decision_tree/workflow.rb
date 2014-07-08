@@ -70,23 +70,12 @@ class DecisionTree::Workflow
 
   public
   def already_called_nonidempotent_method?(name)
-    @steps << [:idempotent_call, name.to_s]
+    @steps << DecisionTree::Step.new(:idempotent_call, name.to_s)
     @nonidempotent_calls.include?(name.to_s)
   end
 
   def record_non_idempotent_method_call!(name)
     @nonidempotent_calls << name
-  end
-
-  def redirect_to(url_method)
-    # I'm still not entirely sure routes belong here.
-    # @redirect = Rails.application.routes.url_helpers.send(url_method, *args)
-    @redirect = url_method
-    @steps << [:redirect, @redirect]
-  end
-
-  def redirect?
-    @redirect.present?
   end
 
   # Class methods
@@ -100,10 +89,10 @@ class DecisionTree::Workflow
 
     define_method(method_name) do
       if send(aliased_method_name)
-        @steps << [method_name, 'YES']
+        @steps << DecisionTree::Step.new(method_name, 'YES')
         @proxy.instance_eval(&yes_block)
       else
-        @steps << [method_name, 'NO']
+        @steps << DecisionTree::Step.new(method_name, 'NO')
         @proxy.instance_eval(&no_block)
       end
     end
@@ -120,7 +109,7 @@ class DecisionTree::Workflow
 
     define_method(method_name) do
       @entry_points << method_name.to_s
-      @steps << ['Entry Point', method_name.to_s]
+      @steps << DecisionTree::Step.new('Entry Point', method_name.to_s)
       send(aliased_method_name)
       store.start_workflow do
         catch :exit do

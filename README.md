@@ -97,3 +97,18 @@ end
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
+
+
+## Style guidelines
+
+We try to adhere to the following coding style guidelines
+
+  * https://github.com/styleguide/ruby
+  * https://github.com/bbatsov/rails-style-guide
+  * https://github.com/bbatsov/ruby-style-guide
+
+## Git Workflow
+
+  * https://github.com/nvie/gitflow
+  * http://nvie.com/posts/a-successful-git-branching-model/
+  * http://danielkummer.github.io/git-flow-cheatsheet/

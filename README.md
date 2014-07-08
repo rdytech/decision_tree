@@ -28,7 +28,7 @@ decision. When called, the decision macro will invoke this method, then
 act according to the truthiness of the response returned - invoking the
 code in its `yes` block for true, and `no` block for false.
 
-To accomodate interruptions to the decision tree, perhaps at locations where
+To accommodate interruptions to the decision tree, perhaps at locations where
 user input is required, the `entry` macro can be used to define new entry
 points. This macro takes the name of the entry point, and can be invoked by
 calling this method from outside the workflow class.
@@ -89,6 +89,56 @@ class Change < ActiveRecord::Base
   end
 end
 ```
+
+##Displaying the Workflow
+Human readable display of workflow steps can be achieved by using `DecisionTree::Step#display`.
+E.g.
+
+```ruby
+- workflow.steps.each do |step|
+  = step.display
+```
+
+The value returned by this will either be one set explicitly in the translations, or one implicitly derived from the step name.
+
+
+### Explicit Display Values
+Human readable translations are defined under `workflow_steps`.
+
+E.g.:
+
+    workflow_steps:
+      entry_point:
+        __start_workflow: 'Decision Workflow Started'
+        reviewed_by_etd!: 'ETD has reviewed the provided evidence'
+      idempotent_call:
+        mark_for_review!: 'Waiting on ETD to review evidence'
+      approval_only_required_from_initiator?:
+        'yes': 'Approval is only required from the initiator'
+        'no': 'This change must be approved by more than the initiator'
+
+Any entry point into the workflow is defined under `entry_point`, including the initial one that is automatically created by the gem (`__start_workflow`).
+Any idempotent calls (identified by a trailing `!`) are defined under `idempotent_call`.
+
+Any regular steps (with a yes/no outcome) are defined directly under `workflow_steps`, and contain values for both 'yes', and 'no'. Note that these keys should be defined as strings (explicitly wrapped in quotes), otherwise YAML helpfully converts these to booleans, which will not be matched when looking for a description.
+
+### Implicit Display Values
+Semi-friendly display values are still returned if no translation has been defined.  
+For a regular step, the question will be rendered, followed by the answer.
+
+```
+# method name: is_contract_full_time?
+# answer is 'NO'
+step.display # => Is contract full time? - No
+
+```
+
+Entry points and idempotent calls are also slightly humanised.
+
+```
+:reviewed_by_etd! # => Reviewed by etd!
+```
+
 
 ## Contributing
 

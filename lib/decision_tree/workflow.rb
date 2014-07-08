@@ -78,17 +78,6 @@ class DecisionTree::Workflow
     @nonidempotent_calls << name
   end
 
-  def redirect_to(url_method)
-    # I'm still not entirely sure routes belong here.
-    # @redirect = Rails.application.routes.url_helpers.send(url_method, *args)
-    @redirect = url_method
-    @steps << DecisionTree::Step.new(:redirect, @redirect)
-  end
-
-  def redirect?
-    @redirect.present?
-  end
-
   # Class methods
   #-----------------------------------------------------------------------------
   def self.decision(method_name, &block)

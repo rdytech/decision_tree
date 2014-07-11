@@ -14,15 +14,24 @@ class DecisionTree::Workflow
   attr_accessor :logger
   attr_reader :steps # Temporary - should we persist this?
 
-  def initialize(store=nil)
+  def initialize(store = nil, run_workflow = true)
     @store = store || DecisionTree::Store.new
     @steps = []
     initialize_persistent_state
     @proxy = DecisionTree::Proxy.new(self)
 
+    execute if run_workflow
+  end
+
+  def logger
+    @logger ||= Logger.new(STDERR)
+  end
+
+  # Executes the workflow
+  def execute
     # We're using pessimistic locking here, so this will block until an
     # exclusive lock can be obtained on the change.
-    store.start_workflow do
+    @store.start_workflow do
       catch :exit do
         if @entry_points.empty?
           send(:__start_workflow)
@@ -35,10 +44,6 @@ class DecisionTree::Workflow
       end
       persist_state!
     end
-  end
-
-  def logger
-    @logger ||= Logger.new(STDERR)
   end
 
   private

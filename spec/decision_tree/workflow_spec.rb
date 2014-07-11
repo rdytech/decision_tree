@@ -3,6 +3,34 @@ require 'spec_helper'
 describe DecisionTree::Workflow do
   let(:store) { DecisionTree::Store.new }
 
+  describe '.initialize' do
+    before do
+      class TestWorkflow < DecisionTree::Workflow
+      end
+    end
+
+    let(:workflow) { TestWorkflow.new(store, run_workflow) }
+    subject { workflow }
+
+    context 'run_workflow true' do
+      let(:run_workflow) { true }
+
+      it 'runs the workflow' do
+        expect_any_instance_of(TestWorkflow).to receive(:execute).once
+        subject
+      end
+    end
+
+    context 'run_workflow false' do
+      let(:run_workflow) { false }
+
+      it 'does not run the workflow' do
+        expect_any_instance_of(TestWorkflow).to_not receive(:execute)
+        subject
+      end
+    end
+  end
+
   describe '.decision' do
     context "when the decision method isn't defined" do
       it 'raises a DecisionTree::Workflow::MethodNotDefinedError' do

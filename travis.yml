@@ -1,0 +1,14 @@
+language: ruby
+rvm:
+  - 2.1.1
+cache:
+  - bundler
+  - apt
+bundler_args: --quiet
+branches:
+  only:
+    - master
+    - develop
+script:
+  - export RAILS_ENV=test
+  - bundle exec rspec

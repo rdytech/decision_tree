@@ -20,6 +20,32 @@ class DecisionTree::Workflow
     initialize_persistent_state
     @proxy = DecisionTree::Proxy.new(self)
 
+    if finished?
+      @steps = store.fetch_steps
+    else
+      execute_workflow
+    end
+  end
+
+  def logger
+    @logger ||= Logger.new(STDERR)
+  end
+
+  def finish!
+    @nonidempotent_calls << 'finish!'
+    @steps << DecisionTree::Step.new('Workflow Finished', '__finish_workflow')
+    store.store_steps!(@steps)
+  end
+
+  def finished?
+    @nonidempotent_calls.include?('finish!')
+  end
+
+  private
+
+  # Actually executes the workflow steps, by executing all the steps from
+  # either the start, or all previously reached entry points
+  def execute_workflow
     # We're using pessimistic locking here, so this will block until an
     # exclusive lock can be obtained on the change.
     store.start_workflow do
@@ -36,12 +62,6 @@ class DecisionTree::Workflow
       persist_state!
     end
   end
-
-  def logger
-    @logger ||= Logger.new(STDERR)
-  end
-
-  private
 
   # We use a DecisionTree::Store to persist workflow across
   # instantiations of the workflow object, and guarantee idempotency. The

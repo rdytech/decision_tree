@@ -22,4 +22,6 @@ RSpec.configure do |config|
   config.filter_run :focus
   config.filter_run_excluding perf: true
   config.order = 'random'
+  config.color = true
+  config.formatter = :documentation
 end

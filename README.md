@@ -1,5 +1,7 @@
 # Decision Tree
 
+[![Build status](https://badge.buildkite.com/ed9359ddd05b5fcf16c05eebd63e23d303b3028cd4daf2d32d.svg)](https://buildkite.com/jobready/decision-tree)
+
 Decision Tree is an easy way of defining rules/workflows that progress an
 object's state through a series of boolean decisions.
 
@@ -90,6 +92,73 @@ class Change < ActiveRecord::Base
 end
 ```
 
+##Finishing the Workflow
+When a workflow has been completed, and you don't want it to evaluate again, you can call `finish!` on the workflow.
+
+```ruby
+class TestWorkflow < DecisionTree::Workflow
+  def do_something
+  	...
+  end
+
+  start do
+  	do_something
+  end
+
+  decision :do_something do
+  	yes { finish! }
+  	no  { finish! }
+  end
+end
+```
+
+This will mark the workflow as finished in the state cache, and call `store_steps!` on the carrier, passing the list of `DecisionTree::Step` objects that were taken on the path to finishing the workflow. After it is finished, subsequent invocations of the workflow will no longer execute the workflow, but call `fetch_steps` on the state carrier.
+
+## Storing Steps
+Implementation of the storage of the steps is left to the application, and does not need to be implemented. DecisionTree will still work correctly without the step storage, but you will be unable to retrieve/display the steps when reloading the workflow after completion. If this is satisfactory, you can leave `store_steps!` and `fetch_steps` empty.
+
+If you do need to store the final steps, below is an example implementation:
+
+```ruby
+class Change < ActiveRecord::Base
+  has_many :workflow_steps, as: :workflowable
+
+  def store_steps!(steps)
+    workflow_steps.destroy_all
+
+    steps.each_with_index do |step, position|
+      new_step = WorkflowStep.from_decision_step(step, self, position)
+      new_step.save!
+    end
+  end
+
+  def fetch_steps
+    workflow_steps
+  end
+end
+
+class WorkflowStep < ActiveRecord::Base
+  belongs_to :workflowable, polymorphic: true
+  default_scope { order(position: :asc) }
+
+  delegate :display, to: :decision_step, allow_nil: true
+  def decision_step
+    @step ||= DecisionTree::Step.new(step_type, step_info)
+  end
+
+  def self.from_decision_step(decision_step, parent, position)
+    step_attrs = {
+      step_type: decision_step.step_type,
+      step_info: decision_step.step_info,
+      workflowable: parent,
+      position: position
+    }
+    self.new(step_attrs)
+  end
+end
+```
+
+
 ##Displaying the Workflow
 Human readable display of workflow steps can be achieved by using `DecisionTree::Step#display`.
 E.g.
@@ -123,7 +192,7 @@ Any idempotent calls (identified by a trailing `!`) are defined under `idempoten
 Any regular steps (with a yes/no outcome) are defined directly under `workflow_steps`, and contain values for both 'yes', and 'no'. Note that these keys should be defined as strings (explicitly wrapped in quotes), otherwise YAML helpfully converts these to booleans, which will not be matched when looking for a description.
 
 ### Implicit Display Values
-Semi-friendly display values are still returned if no translation has been defined.  
+Semi-friendly display values are still returned if no translation has been defined.
 For a regular step, the question will be rendered, followed by the answer.
 
 ```

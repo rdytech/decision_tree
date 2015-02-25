@@ -3,13 +3,13 @@ class DecisionTree::Proxy < BasicObject
     def initialize(proxied_object)
         @proxied_object = proxied_object
     end
-    
+
     def exit(&block)
         @proxied_object.instance_eval(&block)
         throw :exit
         false # This isn't chainable.
     end
-    
+
     def method_missing(name, *args, &block)
         if name.to_s =~ /!\Z/
             # Method names ending with a bang are assumed to be non-idempotent,
@@ -23,6 +23,5 @@ class DecisionTree::Proxy < BasicObject
             else
             return @proxied_object.send(name, *args, &block)
         end
-        
     end
 end

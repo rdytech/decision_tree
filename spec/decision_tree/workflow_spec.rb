@@ -186,4 +186,116 @@ describe DecisionTree::Workflow do
       expect(store.state).to match(/__start_workflow/)
     end
   end
+
+  describe '.initialize' do
+    before do
+      class TestWorkflow < DecisionTree::Workflow
+      end
+
+      allow_any_instance_of(TestWorkflow).to receive(:finished?) { finished }
+    end
+
+    subject { TestWorkflow.new(store) }
+
+    context 'when workflow not previously completed' do
+      let(:finished) { false }
+      specify 'executes the workflow' do
+        expect_any_instance_of(TestWorkflow).to receive(:execute_workflow)
+        subject
+      end
+    end
+
+    context 'when workflow previously completed' do
+      let(:finished) { true }
+
+      specify 'does not execute the workflow' do
+        expect_any_instance_of(TestWorkflow).to_not receive(:execute_workflow)
+        subject
+      end
+
+      specify 'fetches previously executed steps from the store' do
+        expect(store).to receive(:fetch_steps)
+        subject
+      end
+    end
+  end
+
+  describe 'finish!' do
+    subject { workflow.instance_variable_get(:@nonidempotent_calls) }
+    let(:finish!) { workflow.finish! }
+
+    before do
+      class TestWorkflow < DecisionTree::Workflow
+        start {}
+      end
+    end
+
+    let(:workflow) { TestWorkflow.new(store) }
+
+    specify 'records the finish call' do
+      finish!
+      expect(subject).to include('finish!')
+    end
+  end
+
+  describe 'calling finish!' do
+    let(:workflow) { TestWorkflow.new(store) }
+
+    context 'from a start block' do
+
+      before do
+        class TestWorkflow < DecisionTree::Workflow
+          start { finish! }
+        end
+      end
+
+      specify 'calls finish! on the workflow' do
+        expect_any_instance_of(TestWorkflow).to receive(:finish!)
+        workflow
+      end
+    end
+
+    context 'from a decision block' do
+      before do
+        class TestWorkflow < DecisionTree::Workflow
+          def decision_method
+            true
+          end
+
+          start { decision_method }
+
+          decision :decision_method do
+            yes { finish! }
+            no  {  }
+          end
+        end
+      end
+
+      specify 'calls finish! on the workflow' do
+        expect_any_instance_of(TestWorkflow).to receive(:finish!)
+        workflow
+      end
+    end
+  end
+
+  describe '.finished?' do
+    subject { workflow.finished? }
+
+    before do
+      class TestWorkflow < DecisionTree::Workflow
+        start {}
+      end
+    end
+
+    let(:workflow) { TestWorkflow.new(store) }
+
+    context 'when workflow has been finished' do
+      before { workflow.finish! }
+      specify { expect(subject).to be_truthy }
+    end
+
+    context 'when workflow has not been finished' do
+      specify { expect(subject).to be_falsey }
+    end
+  end
 end

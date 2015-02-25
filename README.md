@@ -1,5 +1,7 @@
 # Decision Tree
 
+[![Build status](https://badge.buildkite.com/ed9359ddd05b5fcf16c05eebd63e23d303b3028cd4daf2d32d.svg)](https://buildkite.com/jobready/decision-tree)
+
 Decision Tree is an easy way of defining rules/workflows that progress an
 object's state through a series of boolean decisions.
 
@@ -102,7 +104,7 @@ class TestWorkflow < DecisionTree::Workflow
   start do
   	do_something
   end
-  
+
   decision :do_something do
   	yes { finish! }
   	no  { finish! }
@@ -120,7 +122,7 @@ If you do need to store the final steps, below is an example implementation:
 ```ruby
 class Change < ActiveRecord::Base
   has_many :workflow_steps, as: :workflowable
-  
+
   def store_steps!(steps)
     workflow_steps.destroy_all
 
@@ -190,7 +192,7 @@ Any idempotent calls (identified by a trailing `!`) are defined under `idempoten
 Any regular steps (with a yes/no outcome) are defined directly under `workflow_steps`, and contain values for both 'yes', and 'no'. Note that these keys should be defined as strings (explicitly wrapped in quotes), otherwise YAML helpfully converts these to booleans, which will not be matched when looking for a description.
 
 ### Implicit Display Values
-Semi-friendly display values are still returned if no translation has been defined.  
+Semi-friendly display values are still returned if no translation has been defined.
 For a regular step, the question will be rendered, followed by the answer.
 
 ```

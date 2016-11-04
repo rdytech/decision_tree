@@ -2,7 +2,7 @@
 set -e
 
 echo '--- setting ruby version'
-rbenv local 2.1.3
+rbenv local 2.1.5
 
 echo '--- bundling'
 bundle install -j $(nproc) --without production --quiet

@@ -49,7 +49,6 @@ describe DecisionTree::Workflow do
             decision_method
           end
         end
-        expect_any_instance_of(TestWorkflow).to receive(:__decision_method).once.and_return(true)
       end
 
       it 'calls only the yes block' do
@@ -75,7 +74,6 @@ describe DecisionTree::Workflow do
             decision_method
           end
         end
-        expect_any_instance_of(TestWorkflow).to receive(:__decision_method).once.and_return(false)
       end
 
       it 'calls only the no block' do
@@ -117,15 +115,47 @@ describe DecisionTree::Workflow do
         end
       end
     end
+
+    context 'when the workflow is already finished' do
+      before do
+        class TestWorkflow < DecisionTree::Workflow
+          def decision_method
+          end
+
+          decision :decision_method do
+            yes { }
+            no { }
+          end
+        end
+      end
+
+      it 'does not execute the decision' do
+        allow_any_instance_of(TestWorkflow).to receive(:finished?).and_return(true)
+        expect_any_instance_of(TestWorkflow).not_to receive(:__decision_method)
+        TestWorkflow.new(store).send(:decision_method)
+      end
+    end
   end
 
   describe '.entry' do
     before do
       class TestWorkflow < DecisionTree::Workflow
+        def always_true
+          true
+        end
+
+        def non_idempotent_action!
+        end
+
         def test_entry
         end
 
-        entry(:test_entry) {}
+        decision :always_true do
+          yes { non_idempotent_action! }
+          no { exit }
+        end
+
+        entry(:test_entry) { always_true }
         start {}
       end
     end
@@ -154,6 +184,35 @@ describe DecisionTree::Workflow do
         # We call the external method rather than the aliased one.
         expect_any_instance_of(TestWorkflow).to receive(:test_entry).once
         TestWorkflow.new(store)
+      end
+    end
+
+    context 'for a store that updates state before yielding to workflow (ie locking)' do
+      subject { TestWorkflow.new(store) }
+      let(:store) { TestStore.new }
+
+      before do
+        class TestStore < DecisionTree::Store
+          def start_workflow(&block)
+            self.state = '__start_workflow:non_idempotent_action!'
+            yield
+          end
+        end
+      end
+
+      it 'does not call the non-idempotent method again' do
+        expect_any_instance_of(TestWorkflow).to_not receive(:non_idempotent_action!)
+        subject.test_entry
+      end
+    end
+
+    context 'when the workflow is already finished' do
+      subject { TestWorkflow.new(store) }
+
+      it 'does not execute the entry point' do
+        allow_any_instance_of(TestWorkflow).to receive(:finished?).and_return(true)
+        expect_any_instance_of(TestWorkflow).not_to receive(:__test_entry)
+        subject.test_entry
       end
     end
   end
@@ -188,33 +247,72 @@ describe DecisionTree::Workflow do
   end
 
   describe '.initialize' do
-    before do
-      class TestWorkflow < DecisionTree::Workflow
-      end
-
-      allow_any_instance_of(TestWorkflow).to receive(:finished?) { finished }
-    end
-
     subject { TestWorkflow.new(store) }
 
-    context 'when workflow not previously completed' do
-      let(:finished) { false }
-      specify 'executes the workflow' do
-        expect_any_instance_of(TestWorkflow).to receive(:execute_workflow)
-        subject
+    let(:store) { TestStore.new }
+
+    before do
+      class TestWorkflow < DecisionTree::Workflow
+        def always_true
+          true
+        end
+
+        decision :always_true do
+          yes { non_idempotent_action! }
+          no { exit }
+        end
+
+        start { always_true }
       end
     end
 
-    context 'when workflow previously completed' do
-      let(:finished) { true }
+    context 'for store that simply yields to the workflow' do
+      before do
+        class TestStore < DecisionTree::Store
+          def start_workflow(&block)
+            yield
+          end
+        end
 
-      specify 'does not execute the workflow' do
-        expect_any_instance_of(TestWorkflow).to_not receive(:execute_workflow)
-        subject
+        allow_any_instance_of(TestWorkflow).to receive(:finished?) { finished }
       end
 
-      specify 'fetches previously executed steps from the store' do
-        expect(store).to receive(:fetch_steps)
+      context 'when workflow previously completed' do
+        let(:finished) { true }
+
+        it 'does not execute the workflow' do
+          expect_any_instance_of(TestWorkflow).to_not receive(:execute_workflow)
+          subject
+        end
+
+        it 'fetches previously executed steps from the store' do
+          expect(store).to receive(:fetch_steps)
+          subject
+        end
+      end
+
+      context 'when workflow not previously completed' do
+        let(:finished) { false }
+
+        it 'executes the workflow' do
+          expect_any_instance_of(TestWorkflow).to receive(:execute_workflow)
+          subject
+        end
+      end
+    end
+
+    context 'for a store that updates state before yielding to workflow (ie locking)' do
+      before do
+        class TestStore < DecisionTree::Store
+          def start_workflow(&block)
+            self.state = '__start_workflow:non_idempotent_action!'
+            yield
+          end
+        end
+      end
+
+      it 'does not call the non-idempotent method again' do
+        expect_any_instance_of(TestWorkflow).to_not receive(:non_idempotent_action!)
         subject
       end
     end
@@ -232,7 +330,7 @@ describe DecisionTree::Workflow do
 
     let(:workflow) { TestWorkflow.new(store) }
 
-    specify 'records the finish call' do
+    it 'records the finish call' do
       finish!
       expect(subject).to include('finish!')
     end
@@ -249,7 +347,7 @@ describe DecisionTree::Workflow do
         end
       end
 
-      specify 'calls finish! on the workflow' do
+      it 'calls finish! on the workflow' do
         expect_any_instance_of(TestWorkflow).to receive(:finish!)
         workflow
       end
@@ -271,7 +369,7 @@ describe DecisionTree::Workflow do
         end
       end
 
-      specify 'calls finish! on the workflow' do
+      it 'calls finish! on the workflow' do
         expect_any_instance_of(TestWorkflow).to receive(:finish!)
         workflow
       end

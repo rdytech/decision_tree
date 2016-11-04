@@ -17,13 +17,18 @@ class DecisionTree::Workflow
   def initialize(store=nil)
     @store = store || DecisionTree::Store.new
     @steps = []
-    initialize_persistent_state
     @proxy = DecisionTree::Proxy.new(self)
 
-    if finished?
-      @steps = store.fetch_steps
-    else
-      execute_workflow
+    store.start_workflow do
+      initialize_persistent_state
+
+      if finished?
+        @steps = store.fetch_steps
+      else
+        execute_workflow
+      end
+
+      persist_state!
     end
   end
 
@@ -46,20 +51,15 @@ class DecisionTree::Workflow
   # Actually executes the workflow steps, by executing all the steps from
   # either the start, or all previously reached entry points
   def execute_workflow
-    # We're using pessimistic locking here, so this will block until an
-    # exclusive lock can be obtained on the change.
-    store.start_workflow do
-      catch :exit do
-        if @entry_points.empty?
-          send(:__start_workflow)
-        else
-          # TODO: This should fail silently if an entry point is no longer
-          # defined, this will allow for modification of the workflows with
-          # existing changes in the DB.
-          @entry_points.each { |ep| send(ep) }
-        end
+    catch :exit do
+      if @entry_points.empty?
+        send(:__start_workflow)
+      else
+        # TODO: This should fail silently if an entry point is no longer
+        # defined, this will allow for modification of the workflows with
+        # existing changes in the DB.
+        @entry_points.each { |ep| send(ep) }
       end
-      persist_state!
     end
   end
 
@@ -108,6 +108,8 @@ class DecisionTree::Workflow
     fail YesAndNoRequiredError unless yes_block && no_block
 
     define_method(method_name) do
+      return if finished?
+
       if send(aliased_method_name)
         @steps << DecisionTree::Step.new(method_name, 'YES')
         @proxy.instance_eval(&yes_block)
@@ -128,6 +130,8 @@ class DecisionTree::Workflow
     aliased_method_name = alias_method_name(method_name)
 
     define_method(method_name) do
+      return self if finished?
+
       @entry_points << method_name.to_s
       @steps << DecisionTree::Step.new('Entry Point', method_name.to_s)
       send(aliased_method_name)
@@ -137,6 +141,7 @@ class DecisionTree::Workflow
         end
         persist_state!
       end
+
       self
     end
   end

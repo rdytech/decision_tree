@@ -2,7 +2,10 @@
 set -e
 
 echo '--- setting ruby version'
-rbenv local 2.1.3
+rbenv install -s 2.2.2
+rbenv local 2.2.2
+rbenv rehash
+gem install bundler --no-rdoc --no-ri
 
 echo '--- bundling'
 bundle install -j $(nproc) --without production --quiet
